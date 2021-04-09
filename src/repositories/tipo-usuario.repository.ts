@@ -6,11 +6,11 @@ import {UsuarioRepository} from './usuario.repository';
 
 export class TipoUsuarioRepository extends DefaultCrudRepository<
   TipoUsuario,
-  typeof TipoUsuario.prototype._id,
+  typeof TipoUsuario.prototype.id,
   TipoUsuarioRelations
 > {
 
-  public readonly usuarios: HasManyRepositoryFactory<Usuario, typeof TipoUsuario.prototype._id>;
+  public readonly usuarios: HasManyRepositoryFactory<Usuario, typeof TipoUsuario.prototype.id>;
 
   constructor(
     @inject('datasources.mongodbs') dataSource: MongodbsDataSource, @repository.getter('UsuarioRepository') protected usuarioRepositoryGetter: Getter<UsuarioRepository>,

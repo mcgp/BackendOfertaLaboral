@@ -1,3 +1,4 @@
+import {service} from '@loopback/core';
 import {
   Count,
   CountSchema,
@@ -16,15 +17,28 @@ import {
   del,
   requestBody,
   response,
+  HttpErrors,
 } from '@loopback/rest';
 import {Usuario} from '../models';
 import {UsuarioRepository} from '../repositories';
+import {FuncionesGeneralesService, NotificacionesService, SesionService} from '../services';
+import {Keys as llaves} from '../config/keys';
+import {Credenciales} from '../models/credenciales.model';
+
+
 
 export class UsuarioController {
   constructor(
     @repository(UsuarioRepository)
     public usuarioRepository : UsuarioRepository,
-  ) {}
+    @service(FuncionesGeneralesService)
+    public servicioFunciones: FuncionesGeneralesService,
+    @service(NotificacionesService)
+    public servicioNotificaciones: NotificacionesService,
+    @service(SesionService)
+    public servicioSesion: SesionService
+
+    ) {}
 
   @post('/usuarios')
   @response(200, {
@@ -37,15 +51,61 @@ export class UsuarioController {
         'application/json': {
           schema: getModelSchemaRef(Usuario, {
             title: 'NewUsuario',
-            exclude: ['_id'],
+            exclude: ['id','clave'],
           }),
         },
       },
     })
-    usuario: Omit<Usuario, '_id'>,
+    usuario: Omit<Usuario, 'id'>,
   ): Promise<Usuario> {
-    return this.usuarioRepository.create(usuario);
+    let claveAleatoria = this.servicioFunciones.GenerarClaveAleatoria();
+    console.log(claveAleatoria);
+
+    let claveCifrada = this.servicioFunciones.CifrarTexto(claveAleatoria);
+    console.log(claveCifrada);
+
+    usuario.clave =claveCifrada;
+    let usuarioCreado =  await this.usuarioRepository.create(usuario);
+    if (usuarioCreado) {
+      let contenido = `Hola! Tu registro ha sido un exito, tus credenciales de acceso son |Usuario|: ${usuarioCreado.nombre_usuario} - |Contraseña|: ${claveAleatoria}`;
+      this.servicioNotificaciones.EnviarCorreoElectronico(usuarioCreado.nombre_usuario, llaves.asuntoNuevoUsuario,contenido);
+    }
+    // notificacion via email
+
+
+    return usuarioCreado;
+
   }
+
+  @post('/identificar-usuario')
+  async validar(
+    @requestBody(
+      {
+        content:{
+          'application/json':{
+            schema: getModelSchemaRef(Credenciales)
+          }
+        }
+      }
+    )
+    credenciales: Credenciales
+  ): Promise <object>{
+    let usuario = await this.usuarioRepository.findOne({where:{nombre_usuario: credenciales.nombre_usuario, clave: credenciales.clave}});
+    if(usuario){
+      // generar un token
+      let token = this.servicioSesion.GenerarToken(usuario);
+      return {
+        user: {
+          username: usuario.nombre_usuario,
+          role: usuario.tipoUsuarioId
+        },
+        tk: token
+      };
+    }else{
+      throw new HttpErrors[401]("Las credenciales no son correctas");
+    }
+  }
+
 
   @get('/usuarios/count')
   @response(200, {
@@ -95,7 +155,7 @@ export class UsuarioController {
     return this.usuarioRepository.updateAll(usuario, where);
   }
 
-  @get('/usuarios/{_id}')
+  @get('/usuarios/{id}')
   @response(200, {
     description: 'Usuario model instance',
     content: {
@@ -105,18 +165,18 @@ export class UsuarioController {
     },
   })
   async findById(
-    @param.path.string('_id') id: string,
+    @param.path.string('id') id: string,
     @param.filter(Usuario, {exclude: 'where'}) filter?: FilterExcludingWhere<Usuario>
   ): Promise<Usuario> {
     return this.usuarioRepository.findById(id, filter);
   }
 
-  @patch('/usuarios/{_id}')
+  @patch('/usuarios/{id}')
   @response(204, {
     description: 'Usuario PATCH success',
   })
   async updateById(
-    @param.path.string('_id') id: string,
+    @param.path.string('id') id: string,
     @requestBody({
       content: {
         'application/json': {
@@ -129,22 +189,22 @@ export class UsuarioController {
     await this.usuarioRepository.updateById(id, usuario);
   }
 
-  @put('/usuarios/{_id}')
+  @put('/usuarios/{id}')
   @response(204, {
     description: 'Usuario PUT success',
   })
   async replaceById(
-    @param.path.string('_id') id: string,
+    @param.path.string('id') id: string,
     @requestBody() usuario: Usuario,
   ): Promise<void> {
     await this.usuarioRepository.replaceById(id, usuario);
   }
 
-  @del('/usuarios/{_id}')
+  @del('/usuarios/{id}')
   @response(204, {
     description: 'Usuario DELETE success',
   })
-  async deleteById(@param.path.string('_id') id: string): Promise<void> {
+  async deleteById(@param.path.string('id') id: string): Promise<void> {
     await this.usuarioRepository.deleteById(id);
   }
 }

@@ -31,7 +31,7 @@ export class UsuarioTipoUsuarioController {
     },
   })
   async getTipoUsuario(
-    @param.path.string('id') id: typeof Usuario.prototype._id,
+    @param.path.string('id') id: typeof Usuario.prototype.id,
   ): Promise<TipoUsuario> {
     return this.usuarioRepository.tipoUsuario(id);
   }

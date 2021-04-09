@@ -8,7 +8,7 @@ export class TipoUsuario extends Entity {
     id: true,
     generated: true,
   })
-  _id?: string;
+  id?: string;
 
   @property({
     type: 'string',
